@@ -1,0 +1,10 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "sns-test"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1wjainy643p2n"
+s3_prefix = "sns-test"
+region = "sa-east-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "StageName=\"dev\""

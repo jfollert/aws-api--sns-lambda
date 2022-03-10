@@ -1,0 +1,106 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+  API SNS LAMBDA
+
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+
+Resources:
+  ExampleTopic:
+    Type: "AWS::SNS::Topic"
+    Properties:
+      TopicName: !Sub "${AWS::StackName}-example-topic"
+
+  ExampleAPI:
+    Type: "AWS::Serverless::Api"
+    Properties:
+      StageName: !Ref StageName
+      DefinitionBody:
+        swagger: "2.0"
+        info:
+          title: !Sub "${AWS::StackName}-api"
+        paths:
+          /example-path:
+            post:
+              responses:
+                "202":
+                  description: Accepted
+              x-amazon-apigateway-integration:
+                type: "aws"
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:sns:action/Publish"
+                credentials: !GetAtt ExampleTopicAPIRole.Arn
+                requestParameters:
+                  integration.request.querystring.Message: "method.request.body"
+                  integration.request.querystring.TopicArn: !Sub "'${ExampleTopic}'"
+                responses:
+                  default:
+                    statusCode: 202
+          
+
+  ExampleTopicAPIRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "apigateway.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Sub "${AWS::StackName}-example-topic-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action: "sns:Publish"
+                Effect: "Allow"
+                Resource: !Ref ExampleTopic
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+
+  FirstExampleWorkerLambda:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: app.handler
+      Runtime: nodejs14.x
+      CodeUri: ./first_lambda/src
+      Events:
+        SNSMessage:
+          Type: SNS
+          Properties:
+            Topic: !Ref ExampleTopic
+
+  SecondExampleWorkerLambda:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: app.handler
+      Runtime: nodejs14.x
+      CodeUri: ./second_lambda/src
+      Events:
+        SNSMessage:
+          Type: SNS
+          Properties:
+            Topic: !Ref ExampleTopic 
+
+Outputs:
+  APIURI:
+    Description: "The API REST URI to connect to"
+    Value:
+      !Sub https://${ExampleAPI}.execute-api.sa-east-1.amazonaws.com/${StageName}/
+      # !Join [
+      #   "",
+      #   [
+      #     "wss://",
+      #     !Ref APIWebSocket,
+      #     ".execute-api.",
+      #     !Ref "AWS::Region",
+      #     ".amazonaws.com/",
+      #     !Ref "Stage",
+      #   ],
+      # ]
